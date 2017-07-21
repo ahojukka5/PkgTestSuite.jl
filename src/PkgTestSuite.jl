@@ -54,8 +54,12 @@ Clone and build package subject to testing.
 function init(pkg::String="")
     pkg = determine_pkg_name(pkg)
     where = get(ENV, "TRAVIS_BUILD_DIR", pwd())
-    info("init(): location of package = $where")
-    info("init(): determined package to be $pkg")
+    repo = LibGit2.GitRepo(Pkg.dir("PkgTestSuite"))
+    hash = string(LibGit2.revparseid(repo, "master"))
+    hash_short = hash[1:7]
+    info("init(): PkgTestSuite commit hash   $hash_short")
+    info("init(): location of package        $where")
+    info("init(): determined package to be   $pkg")
     Pkg.clone(where)
     Pkg.build(pkg)
 end
