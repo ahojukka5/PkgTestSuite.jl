@@ -7,9 +7,12 @@ Usage from command line:
 ```julia
 julia> using PkgTestSuite
 julia> test(pkg)
+julia> deploy(pkg)
 ```
 
-From Travis-CI:
+`pkg` is the name of the package. If running `deploy()` from command line, documentation is generated to `docs/site`.
+
+Usage from Travis-CI:
 
 ```yaml
 before_script:
