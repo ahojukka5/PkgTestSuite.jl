@@ -160,12 +160,6 @@ Deploy package.
 function deploy(pkg::String="")
 
     pkg = determine_pkg_name(pkg)
-    cd(Pkg.dir(pkg))
-
-    # upload results to coveralls.io
-    result = Coveralls.process_folder()
-    Coveralls.submit(result)
-    cd(Pkg.dir(pkg, "docs"))
 
     mkdocs_template = """
 site_name: $pkg.jl
@@ -195,13 +189,30 @@ docs_dir: 'build'
 pages:
     - Home: index.md
 """
-    println("writing the following mkdocs.yml file content:")
-    println(mkdocs_template)
+    cd(Pkg.dir(pkg, "docs"))
+    if !isfile("mkdocs.yml")
+        println("writing the following mkdocs.yml file content:")
+        println(mkdocs_template)
+        fid = open("mkdocs.yml", "w")
+        write(fid, mkdocs_template)
+        close(fid)
+    end
+
+    if !haskey(ENV, "TRAVIS")
+        println("Looks that you are not running deploy on CI platform")
+        println("Generating documentation using `mkdocs build`")
+        run(`mkdocs build`)
+        println("Documentation generated to ", Pkg.dir(pkg, "docs", "site"))
+        return
+    end
+
+    # upload results to coveralls.io
+    cd(Pkg.dir(pkg))
+    result = Coveralls.process_folder()
+    Coveralls.submit(result)
 
     # deploy documentation to juliafem.github.io
-    fid = open("mkdocs.yml", "w")
-    write(fid, mkdocs_template)
-    close(fid)
+    cd(Pkg.dir(pkg, "docs"))
     deploydocs(
         deps = Deps.pip("mkdocs", "python-markdown-math"),
         repo = "github.com/JuliaFEM/$pkg.jl.git",
