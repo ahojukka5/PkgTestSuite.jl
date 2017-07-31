@@ -105,10 +105,14 @@ function test(pkg::String="")
 
     # generate documentation and run doctests
     cd(Pkg.dir(pkg, "docs"))
-    makedocs(
-        modules = [getfield(Main, Symbol(pkg))],
-        checkdocs = :all,
-        strict = strict_docs)
+    if isfile("make.jl")
+        include("make.jl")
+    else
+        makedocs(
+            modules = [getfield(Main, Symbol(pkg))],
+            checkdocs = :all,
+            strict = strict_docs)
+    end
 
     # run pkg tests
     cd(Pkg.dir(pkg, "test"))
