@@ -217,10 +217,14 @@ pages:
 
     # deploy documentation to juliafem.github.io
     cd(Pkg.dir(pkg, "docs"))
-    deploydocs(
-        deps = Deps.pip("mkdocs", "python-markdown-math"),
-        repo = "github.com/JuliaFEM/$pkg.jl.git",
-        julia = "0.6")
+    if isfile("deploy.jl")
+        include("deploy.jl")
+    else
+        deploydocs(
+            deps = Deps.pip("mkdocs", "python-markdown-math"),
+            repo = "github.com/JuliaFEM/$pkg.jl.git",
+            julia = "0.6")
+    end
 end
 
 export init, test, deploy
