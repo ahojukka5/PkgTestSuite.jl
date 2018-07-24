@@ -68,19 +68,25 @@ function init(pkg_name::String="")
 end
 
 """
-    test(pkg::String)
+    test(pkg_name)
 
-Run tests for pkg.
+Run tests for package.
 """
-function test(pkg::String=""; run_tests=true)
+function test(pkg_name=""; run_tests=true)
 
-    pkg = determine_pkg_name(pkg)
-    cd(Pkg.dir(pkg))
-    Base.require(Symbol(pkg))
+    pkg_name = determine_pkg_name(pkg_name)
+    pkg_dir = Pkg.dir(pkg_name)
+    cd(pkg_dir)
+    if VERSION < v"0.7.0-beta2.0"
+        Base.require(Symbol(pkg_name))
+        pkg = getfield(Main, Symbol(pkg_name))
+    else
+        pkg = Base.require(Module(Symbol(pkg_name)), Symbol(pkg_name))
+    end
 
     # check for headers and tabulators
-    checkheader(pkg)
-    checktabs(pkg)
+    checkheader(pkg_name)
+    checktabs(pkg_name)
 
     # make it possible to allow lint check or doctest fail
     # without failing whole build
@@ -89,7 +95,7 @@ function test(pkg::String=""; run_tests=true)
 
     # run lint
     if USING_LINT
-        results = lintpkg(pkg)
+        results = lintpkg(pkg_name)
         if !isempty(results)
             info("Lint.jl is a tool that uses static analysis to assist ",
                  "in the development process by detecting common bugs and ",
@@ -110,10 +116,10 @@ function test(pkg::String=""; run_tests=true)
     end
 
     # generate documentation and run doctests
-    docs_dir = Pkg.dir(pkg, "docs")    
-    docs_src_dir = Pkg.dir(pkg, "docs", "src")
-    readme_file = Pkg.dir(pkg, "README.md")
-    index_file = Pkg.dir(pkg, "docs", "src", "index.md")
+    docs_dir = Pkg.dir(pkg_name, "docs")    
+    docs_src_dir = Pkg.dir(pkg_name, "docs", "src")
+    readme_file = Pkg.dir(pkg_name, "README.md")
+    index_file = Pkg.dir(pkg_name, "docs", "src", "index.md")
     if !isdir(docs_dir)
         info("Creating new directory $docs_dir")
         mkdir(docs_dir)
@@ -128,7 +134,7 @@ function test(pkg::String=""; run_tests=true)
             info("Copying $readme_file to $index_file")
             cp(readme_file, index_file)
         else
-            index_file_default_contents = """# $pkg.jl
+            index_file_default_contents = """# $pkg_name.jl
 
 Package documentation missing. Start writing documentation to package by
 creating docs/src/index.md where it is described what this package does.
@@ -139,27 +145,27 @@ Also, create README.md"""
             end
         end
     end
-    cd(Pkg.dir(pkg, "docs"))
-    makefile = Pkg.dir(pkg, "docs", "make.jl")
+    cd(docs_dir)
+    makefile = joinpath(docs_dir, "make.jl")
     if isfile(makefile)
         include(makefile)
     else
         warn("$makefile not found, using defaults to generate documentation.")
         makedocs(
-            modules = [getfield(Main, Symbol(pkg))],
+            modules = [pkg],
             format = :html,
             checkdocs = :all,
-            sitename = "$pkg.jl",
+            sitename = "$pkg_name.jl",
             pages = ["index.md"],
             strict = strict_docs)
     end
 
     # run pkg tests
-    runtests_file = Pkg.dir(pkg, "test", "runtests.jl")
+    runtests_file = Pkg.dir(pkg_name, "test", "runtests.jl")
     if isfile(runtests_file) && run_tests
-        Pkg.test(pkg, coverage=true)
+        Pkg.test(pkg_name, coverage=true)
     else
-        warn("Not running tests for $pkg.")
+        warn("Not running tests for $pkg_name.")
     end
     return nothing
 end
