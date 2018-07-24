@@ -1,6 +1,7 @@
 # PkgTestSuite.jl
 
-[![Build Status](https://travis-ci.org/JuliaFEM/PkgTestSuite.jl.svg?branch=master)](https://travis-ci.org/JuliaFEM/PkgTestSuite.jl)
+[![][travis-img]][travis-url]
+[![][coveralls-img]][coveralls-url]
 
 Standard test suite for packages under JuliaFEM organization. The purpose of
 this package is to
@@ -43,3 +44,8 @@ reason is's possible to set key `LINT_STRICT` to `false` in Travis environment
 variable to make deploy success even if Lint.jl is giving some warnings.
 Correspondingly there is a key `DOCUMENTER_STRICT` which can be set to `false`
 to skip errors in Documenter.jl caused by missing docstrings or failed doctests.
+
+[travis-img]: https://travis-ci.org/JuliaFEM/PkgTestSuite.jl.svg?branch=master
+[travis-url]: https://travis-ci.org/JuliaFEM/PkgTestSuite.jl
+[coveralls-img]: https://coveralls.io/repos/github/JuliaFEM/PkgTestSuite.jl/badge.svg?branch=master
+[coveralls-url]: https://coveralls.io/github/JuliaFEM/PkgTestSuite.jl?branch=master
