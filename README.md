@@ -1,16 +1,21 @@
 # PkgTestSuite.jl
 
-Standard test suite for packages under JuliaFEM
+[![Build Status](https://travis-ci.org/JuliaFEM/PkgTestSuite.jl.svg?branch=master)](https://travis-ci.org/JuliaFEM/PkgTestSuite.jl)
+
+Standard test suite for packages under JuliaFEM organization. The purpose of
+this package is to
+1. avoid unnecessary boilerplate code of setting up new packages, and
+2. provide a standardized way to test that package matches to JuliaFEM standards.
 
 Usage from command line:
 
 ```julia
 julia> using PkgTestSuite
-julia> test(pkg)
-julia> deploy(pkg)
+julia> test(pkg_name)
+julia> deploy(pkg_name)
 ```
 
-`pkg` is the name of the package. If running `deploy()` from command line, documentation is generated to `docs/site`.
+If running `deploy()` from command line, documentation is generated to `docs/site`.
 
 Usage from Travis-CI:
 
@@ -25,10 +30,10 @@ after_success:
 ```
 
 Default sequence is:
-1. check that all source files contain licence string using CheckHeader.jl
-2. check that no tabs are used in source files using CheckTabs.jl
+1. check that all source files contain licence string
+2. check that no tabs are used in source files
 3. check code syntax using Lint.jl
-4. check documentation using Documenter.jl
+4. generate documentation of package using Documenter.jl
 5. run all unit tests
 6. deploy documentation to juliafem.github.io and coverage report to coveralls.io
 

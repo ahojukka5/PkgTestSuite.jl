@@ -1,37 +1,23 @@
 # This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/PkgTestSuite.jl/blob/master/LICENSE
+# License is MIT: see https://github.com/JuliaFEM/PkgTestSuite.jl/blob/master/LICENSE
 
 module PkgTestSuite
 
-installed_packages = Pkg.installed()
-
-if !haskey(installed_packages, "CheckHeader")
-    Pkg.clone("https://github.com/ahojukka5/CheckHeader.jl.git")
-end
-if !haskey(installed_packages, "CheckTabs")
-    Pkg.clone("https://github.com/ahojukka5/CheckTabs.jl.git")
-end
-if !haskey(installed_packages, "Coverage")
-    Pkg.add("Coverage")
-end
-if !haskey(installed_packages, "Documenter")
-    Pkg.add("Documenter")
-end
-if !haskey(installed_packages, "Lint")
-    Pkg.add("Lint")
-end
-if !haskey(installed_packages, "TimerOutputs")
-    Pkg.add("TimerOutputs")
-end
-
-using CheckHeader
-using CheckTabs
 using Coverage
 using Documenter
-using Lint
 using TimerOutputs
-
 using Base.Test
+
+USING_LINT = true
+try
+    using Lint
+catch
+    info("Cannot use Lint.jl with Julia version $VERSION")
+    USING_LINT = false
+end
+
+include("checkheader.jl")
+include("checktabs.jl")
 
 """
     determine_pkg_name(pkg::String="")
@@ -89,18 +75,24 @@ function test(pkg::String="")
     strict_docs = (get(ENV, "DOCUMENTER_STRICT", "true") == "true")
 
     # run lint
-    results = lintpkg(pkg)
-    if !isempty(results)
-        info("Lint.jl is a tool that uses static analysis to assist in the development process by detecting common bugs and potential issues.")
-        info("For this package, Lint.jl report is following:")
-        display(results)
-        info("For more information, see https://lintjl.readthedocs.io/en/stable/")
-        warn("Package syntax test has failed.")
-        if strict_lint
-            @test isempty(results)
+    if USING_LINT
+        results = lintpkg(pkg)
+        if !isempty(results)
+            info("Lint.jl is a tool that uses static analysis to assist ",
+                 "in the development process by detecting common bugs and ",
+                 "potential issues.")
+            info("For this package, Lint.jl report is following:")
+            display(results)
+            info("For more information, see https://lintjl.readthedocs.io/en/stable/")
+            warn("Package syntax test has failed.")
+            if strict_lint
+                @test isempty(results)
+            end
+        else
+            info("Lint.jl: syntax check pass.")
         end
     else
-        info("Lint.jl: syntax check pass.")
+        info("Lint.jl is not 0.7 compatible yet.")
     end
 
     # generate documentation and run doctests

@@ -1,0 +1,15 @@
+language: julia
+os:
+  - linux
+  - osx
+julia:
+  - 0.6
+  - 0.7
+  - nightly
+#matrix:
+#  allow_failures:
+#    - julia: 0.7
+#    - julia: nightly
+#  fast_finish: true
+after_success:
+    - julia --color=yes -e 'using PkgTestSuite; deploy()'
