@@ -3,5 +3,6 @@
 *.jl.mem
 deps/deps.jl
 docs/site
+docs/build
 new_file_with_tabs.jl
 new_file_with_wrong_license_header.jl

@@ -41,17 +41,30 @@ end
 
 Clone and build package subject to testing.
 """
-function init(pkg::String="")
-    pkg = determine_pkg_name(pkg)
-    where = get(ENV, "TRAVIS_BUILD_DIR", pwd())
+function init(pkg_name::String="")
+    pkg_name = determine_pkg_name(pkg_name)
+    info("PkgTestSuite.init(): determined package name to be $pkg_name")
+    inside_travis = haskey(ENV, "TRAVIS")
+    if inside_travis
+        pkg_path = ENV["TRAVIS_BUILD_DIR"]
+    else
+        pkg_path = Pkg.dir(pkg_name)
+    end
+    info("PkgTestSuite.init(): detemined location of package to be $pkg_path")
+    if pkg_name == "PkgTestSuite"
+        # self-checking PkgTestSuite, not build another time even inside Travis-CI
+        return nothing
+    end
     repo = LibGit2.GitRepo(Pkg.dir("PkgTestSuite"))
-    hash = string(LibGit2.revparseid(repo, "master"))
-    hash_short = hash[1:7]
-    info("init(): PkgTestSuite commit hash   $hash_short")
-    info("init(): location of package        $where")
-    info("init(): determined package to be   $pkg")
-    Pkg.clone(where)
-    Pkg.build(pkg)
+    hash_long = string(LibGit2.revparseid(repo, "master"))
+    hash_short = hash_long[1:7]
+    info("PkgTestSuite.init(): Determined PkgTestSuite commit hash to be $hash_short")
+    if inside_travis
+        info("Inside Travis-CI, cloning and building package")
+        Pkg.clone(pkg_path)
+        Pkg.build(pkg_name)
+    end
+    return nothing
 end
 
 """
@@ -59,7 +72,7 @@ end
 
 Run tests for pkg.
 """
-function test(pkg::String="")
+function test(pkg::String=""; run_tests=true)
 
     pkg = determine_pkg_name(pkg)
     cd(Pkg.dir(pkg))
@@ -69,7 +82,7 @@ function test(pkg::String="")
     checkheader(pkg)
     checktabs(pkg)
 
-    # make it possible to allo lint check or doctest fail
+    # make it possible to allow lint check or doctest fail
     # without failing whole build
     strict_lint = (get(ENV, "LINT_STRICT", "true") == "true")
     strict_docs = (get(ENV, "DOCUMENTER_STRICT", "true") == "true")
@@ -86,66 +99,69 @@ function test(pkg::String="")
             info("For more information, see https://lintjl.readthedocs.io/en/stable/")
             warn("Package syntax test has failed.")
             if strict_lint
-                @test isempty(results)
+                errors_and_warnings = filter(i -> !isinfo(i), results)
+                @test isempty(errors_and_warnings)
             end
         else
             info("Lint.jl: syntax check pass.")
         end
     else
-        info("Lint.jl is not 0.7 compatible yet.")
+        info("Lint.jl is not $VERSION compatible yet.")
     end
 
     # generate documentation and run doctests
+    docs_dir = Pkg.dir(pkg, "docs")    
+    docs_src_dir = Pkg.dir(pkg, "docs", "src")
+    readme_file = Pkg.dir(pkg, "README.md")
+    index_file = Pkg.dir(pkg, "docs", "src", "index.md")
+    if !isdir(docs_dir)
+        info("Creating new directory $docs_dir")
+        mkdir(docs_dir)
+    end
+    if !isdir(docs_src_dir)
+        info("Creating new directory $docs_src_dir")
+        mkdir(docs_src_dir)
+    end
+    if !isfile(index_file)
+        warn("$index_file not found.")
+        if isfile(readme_file)
+            info("Copying $readme_file to $index_file")
+            cp(readme_file, index_file)
+        else
+            index_file_default_contents = """# $pkg.jl
+
+Package documentation missing. Start writing documentation to package by
+creating docs/src/index.md where it is described what this package does.
+
+Also, create README.md"""
+            open(index_file, "w") do fid
+                write(fid, index_file_default_contents)
+            end
+        end
+    end
     cd(Pkg.dir(pkg, "docs"))
-    if isfile("make.jl")
-        include("make.jl")
+    makefile = Pkg.dir(pkg, "docs", "make.jl")
+    if isfile(makefile)
+        include(makefile)
     else
+        warn("$makefile not found, using defaults to generate documentation.")
         makedocs(
             modules = [getfield(Main, Symbol(pkg))],
+            format = :html,
             checkdocs = :all,
+            sitename = "$pkg.jl",
+            pages = ["index.md"],
             strict = strict_docs)
     end
 
     # run pkg tests
-    cd(Pkg.dir(pkg, "test"))
-    if !isfile("runtests.jl")
-        info("runtests.jl not found, creating default.")
-        runtests_code = """
-# This file is a part of JuliaFEM.
-# License is MIT: see https://github.com/JuliaFEM/$pkg.jl/blob/master/LICENSE
-
-using Base.Test
-using TimerOutputs
-
-pkg_dir = Pkg.dir("$pkg")
-maybe_test_files = readdir(joinpath(pkg_dir, "test"))
-is_test_file(fn) = startswith(fn, "test_") & endswith(fn, ".jl")
-test_files = filter(is_test_file, maybe_test_files)
-info("\$(length(test_files)) test files found.")
-
-const to = TimerOutput()
-@testset "$pkg.jl" begin
-    for fn in test_files
-        info("----- Running tests from file \$fn -----")
-        t0 = time()
-        timeit(to, fn) do
-            include(fn)
-        end
-        dt = round(time() - t0, 2)
-        info("----- Testing file \$fn completed in \$dt seconds -----")
+    runtests_file = Pkg.dir(pkg, "test", "runtests.jl")
+    if isfile(runtests_file) && run_tests
+        Pkg.test(pkg, coverage=true)
+    else
+        warn("Not running tests for $pkg.")
     end
-end
-println()
-println("Test statistics:")
-println(to)
-"""
-        println("writing the following runtests.jl file content:")
-        println(runtests_code)
-        fid = open("runtests.jl", "w")
-        write(fid, runtests_code)
-        close(fid)
-    end
-    Pkg.test(pkg, coverage=true)
+    return nothing
 end
 
 """
@@ -157,49 +173,10 @@ function deploy(pkg::String="")
 
     pkg = determine_pkg_name(pkg)
 
-    mkdocs_template = """
-site_name: $pkg.jl
-repo_url: https://github.com/JuliaFEM/$pkg.jl
-site_description: site_description
-site_author: site_author
-
-theme: readthedocs
-
-extra_css:
-    - assets/Documenter.css
-
-extra_javascript:
-    - https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML
-    - assets/mathjaxhelper.js
-
-markdown_extensions:
-    - extra
-    - tables
-    - fenced_code
-    - footnotes
-    - mdx_math:
-        enable_dollar_delimiter: True
-
-docs_dir: 'build'
-
-pages:
-    - Home: index.md
-"""
-    cd(Pkg.dir(pkg, "docs"))
-    if !isfile("mkdocs.yml")
-        println("writing the following mkdocs.yml file content:")
-        println(mkdocs_template)
-        fid = open("mkdocs.yml", "w")
-        write(fid, mkdocs_template)
-        close(fid)
-    end
-
     if !haskey(ENV, "TRAVIS")
-        println("Looks that you are not running deploy on CI platform")
-        println("Generating documentation using `mkdocs build`")
-        run(`mkdocs build`)
-        println("Documentation generated to ", Pkg.dir(pkg, "docs", "site"))
-        return
+        info("Looks that you are not running deploy on CI platform.")
+        info("Documentation generated to ", Pkg.dir(pkg, "docs", "site"))
+        return nothing
     end
 
     # upload results to coveralls.io
@@ -209,14 +186,19 @@ pages:
 
     # deploy documentation to juliafem.github.io
     cd(Pkg.dir(pkg, "docs"))
-    if isfile("deploy.jl")
-        include("deploy.jl")
+    deploy_file = Pkg.dir(pkg, "docs", "deploy.jl")
+    if isfile(deploy_file)
+        include(deploy_file)
     else
+        warn("deploy.jl not found, deploying using default settings")
         deploydocs(
-            deps = Deps.pip("mkdocs", "python-markdown-math"),
             repo = "github.com/JuliaFEM/$pkg.jl.git",
-            julia = "0.6")
+            julia = "0.6",
+            deps = nothing,
+            make = nothing)
     end
+
+    return nothing
 end
 
 export init, test, deploy

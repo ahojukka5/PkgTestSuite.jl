@@ -11,3 +11,7 @@ end
 @testset "test checktabs" begin 
     include("test_checktabs.jl")
 end
+
+PkgTestSuite.init("PkgTestSuite")
+PkgTestSuite.test("PkgTestSuite"; run_tests=false)
+PkgTestSuite.deploy("PkgTestSuite")
