@@ -6,7 +6,11 @@ module PkgTestSuite
 using Coverage
 using Documenter
 using TimerOutputs
-using Base.Test
+if VERSION < v"1.0.0"
+    using Base.Test
+else
+    using Test
+end
 
 USING_LINT = true
 try
